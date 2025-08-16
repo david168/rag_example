@@ -1,21 +1,41 @@
-# from langchain.document_loaders import DirectoryLoader
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
-# from langchain.embeddings import OpenAIEmbeddings
-from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import Chroma
-import openai 
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_chroma import Chroma
+import google.generativeai as genai
 from dotenv import load_dotenv
 import os
 import shutil
+import nltk
 
 # Load environment variables. Assumes that project contains .env file with API keys
 load_dotenv()
-#---- Set OpenAI API key 
-# Change environment variable name from "OPENAI_API_KEY" to the name given in 
+#---- Set Google API key 
+# Change environment variable name from "GOOGLE_API_KEY" to the name given in 
 # your .env file.
-openai.api_key = os.environ['OPENAI_API_KEY']
+genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
+
+# Download required NLTK data
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
+    
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except LookupError:
+    nltk.download('punkt_tab')
+    
+try:
+    nltk.data.find('taggers/averaged_perceptron_tagger')
+except LookupError:
+    nltk.download('averaged_perceptron_tagger')
+    
+try:
+    nltk.data.find('taggers/averaged_perceptron_tagger_eng')
+except LookupError:
+    nltk.download('averaged_perceptron_tagger_eng')
 
 CHROMA_PATH = "chroma"
 DATA_PATH = "data/books"
@@ -39,8 +59,8 @@ def load_documents():
 
 def split_text(documents: list[Document]):
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=300,
-        chunk_overlap=100,
+        chunk_size=800,  # Increased from 500 to 800
+        chunk_overlap=200,  # Increased from 150 to 200
         length_function=len,
         add_start_index=True,
     )
@@ -60,10 +80,11 @@ def save_to_chroma(chunks: list[Document]):
         shutil.rmtree(CHROMA_PATH)
 
     # Create a new DB from the documents.
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
     db = Chroma.from_documents(
-        chunks, OpenAIEmbeddings(), persist_directory=CHROMA_PATH
+        chunks, embeddings, persist_directory=CHROMA_PATH
     )
-    db.persist()
+    # Note: In newer versions of Chroma, persistence is automatic, so we don't need to call db.persist()
     print(f"Saved {len(chunks)} chunks to {CHROMA_PATH}.")
 
 
